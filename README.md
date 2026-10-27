@@ -82,7 +82,7 @@ echo "texto" | gpg --batch --pinentry-mode loopback --passphrase "casa" -c -o pr
 
 ### Por qué Go
 
-El problema es **vergonzosamente paralelo** y limitado por CPU: cada candidata
+El problema es paralelo y limitado por CPU: cada candidata
 se prueba de forma independiente. Go encaja de forma natural:
 
 - *goroutines* + canales dan paralelismo real (sin GIL) con código sencillo;

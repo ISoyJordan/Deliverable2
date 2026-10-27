@@ -1,0 +1,10 @@
+# binario compilado
+/gpg-cracker
+
+# resultados y logs de experimentos
+*.log
+/bench/results.csv
+
+# temporales
+*.tmp
+secreto.txt

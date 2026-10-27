@@ -1,0 +1,4 @@
+gpg-cracker
+*.log
+bench/results.csv
+.git

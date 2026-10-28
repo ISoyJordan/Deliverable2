@@ -134,58 +134,50 @@ real es **el paralelismo** (repartir derivaciones entre núcleos).
 
 ## 5. Experimentos
 
-El script reproduce el protocolo del enunciado: medir el tiempo de probar
-**N contraseñas inválidas** (por defecto 1000, el peor caso, porque una
-inválida siempre fuerza la derivación completa).
+El script `bench/bench.sh` reproduce el protocolo del enunciado: medir el tiempo
+de probar **N contraseñas inválidas** (una inválida es el peor caso, porque
+siempre fuerza la derivación S2K completa).
 
 ```bash
 go build -o gpg-cracker .
-./bench/bench.sh 1000        # genera bench/results.csv y una tabla
+./bench/bench.sh 100        # genera bench/results.csv y una tabla
 ```
 
 Realiza dos experimentos:
 
-- **A — backend × workers** (generación fija `stream`): compara `native` vs
-  `gpg` y mide el *speedup* al aumentar los *workers*.
-- **B — estrategia de generación** (`native`, todos los núcleos): compara
-  generar las candidatas `stream` (una a una bajo demanda), `preload` (todas
-  en memoria al principio) o `file` (leídas de un fichero de texto).
+- **A — backend × workers** (generación fija `stream`): compara `native` vs `gpg` y mide el *speedup* al aumentar los *workers*.
+- **B — estrategia de generación** (`native`, todos los núcleos): compara `stream`, `preload` y `file`.
 
-### Resultados medidos (contenedor limitado a ~1 núcleo efectivo)
+### Resultados
 
-Medidas orientativas tomadas en un entorno muy restringido (de ahí los valores
-bajos); **ejecuta `./bench/bench.sh` en tu máquina para los números reales**:
+Medidos en mi equipo (Windows + WSL, **8 núcleos lógicos**), con **N = 100** contraseñas inválidas.
 
-| Experimento | Configuración         | Resultado          |
-|-------------|-----------------------|--------------------|
-| Backend     | `native`, stream      | ~7–8 intentos/s    |
-| Backend     | `gpg`, stream         | ~4–7 intentos/s    |
-| Generación  | stream / preload / file | prácticamente idénticos |
+**Experimento A — intentos/s según backend y número de workers**
 
-**Conclusiones:**
+| Workers | native | gpg |
+|:-------:|:------:|:----:|
+| 1 | 8.8 | 6.5 |
+| 2 | 16.6 | 12.2 |
+| 4 | 26.9 | 19.4 |
+| 8 | 31.3 | 23.5 |
 
-1. **`native` supera a `gpg`** (evita el `fork/exec`), pero la ventaja es
-   moderada (~1,3–1,8×): el S2K domina el tiempo en ambos.
-2. **La estrategia de generación es irrelevante en velocidad**: el coste de
-   generar una candidata (nanosegundos) es despreciable frente a la derivación
-   (~0,1 s). Sí importa en **memoria**: `preload` sobre un espacio grande (p. ej.
-   26⁶ ≈ 300 M) consumiría gigabytes, mientras que `stream` usa memoria
-   constante. Por eso el crackeo real usa `stream`.
-3. La ganancia real viene del **paralelismo**: al ser CPU-bound, el *speedup*
-   es casi lineal con el número de núcleos (mídelo con el Experimento A en tu
-   equipo).
+**Experimento B — estrategia de generación** (native, 8 workers)
 
-### Medir en un entorno acotado
+| Estrategia | intentos/s |
+|:----------:|:----------:|
+| stream | 30.0 |
+| preload | 30.3 |
+| file | 30.4 |
 
-El enunciado avisa de que el ruido del SO puede falsear las medidas y recomienda
-un entorno limitado. Con Docker:
+### Conclusiones
 
-```bash
-docker build -t gpg-cracker .
-docker run --rm --cpus=2 --memory=512m gpg-cracker ./bench/bench.sh 1000
-```
+1. **El paralelismo es la palanca clave.** Con el backend nativo el *speedup* es casi lineal hasta 4 *workers* (8.8 → 26.9 int/s, ×3.1) y se aplana al llegar a 8 (×3.6): coherente con una CPU de ~4 núcleos físicos con *hyperthreading*, donde los hilos adicionales comparten unidad de ejecución.
+2. **`native` supera a `gpg` de forma constante (~1.35×)** a igual número de *workers*, porque evita el `fork/exec` de lanzar un proceso por intento. La ventaja es moderada porque el coste del S2K (la derivación de clave) domina el tiempo en ambos.
+3. **La estrategia de generación es irrelevante en velocidad**: `stream`, `preload` y `file` quedan en ~30 int/s. Generar una candidata (nanosegundos) es despreciable frente a la derivación (decenas de ms). Sí importa en **memoria**: `preload` sobre un espacio grande (26⁶ ≈ 300 M) consumiría gigabytes, mientras que `stream` usa memoria constante. Por eso el crackeo real usa `stream`.
 
-`--cpus` y `--memory` fijan CPU **y** memoria, como pide el documento.
+### Nota sobre el entorno de medición
+
+El enunciado recomienda medir en un entorno acotado (contenedor con CPU y memoria limitadas) para reducir el ruido del sistema operativo. En el equipo utilizado (Windows con WSL) no se dispuso de Docker configurado, por lo que las medidas se tomaron directamente sobre WSL, controlando la carga de CPU mediante el número de *workers*. Se incluye un `Dockerfile` listo para ejecutar los experimentos en contenedor como vía recomendada para obtener medidas aún más reproducibles.
 
 ## 6. Estructura del proyecto
 

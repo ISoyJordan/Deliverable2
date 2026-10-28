@@ -140,7 +140,7 @@ siempre fuerza la derivación S2K completa).
 
 ```bash
 go build -o gpg-cracker .
-./bench/bench.sh 100        # genera bench/results.csv y una tabla
+./bench/bench.sh 1000        # genera bench/results.csv y una tabla
 ```
 
 Realiza dos experimentos:
@@ -150,30 +150,30 @@ Realiza dos experimentos:
 
 ### Resultados
 
-Medidos en mi equipo (Windows + WSL, **8 núcleos lógicos**), con **N = 100** contraseñas inválidas.
+Medidos en mi equipo (Windows + WSL, **8 núcleos lógicos**), con **N = 1000** contraseñas inválidas.
 
 **Experimento A — intentos/s según backend y número de workers**
 
 | Workers | native | gpg |
 |:-------:|:------:|:----:|
 | 1 | 8.8 | 6.5 |
-| 2 | 16.6 | 12.2 |
-| 4 | 26.9 | 19.4 |
-| 8 | 31.3 | 23.5 |
+| 2 | 16.2 | 12.1 |
+| 4 | 25.8 | 20.0 |
+| 8 | 29.1 | 22.9 |
 
 **Experimento B — estrategia de generación** (native, 8 workers)
 
 | Estrategia | intentos/s |
 |:----------:|:----------:|
-| stream | 30.0 |
-| preload | 30.3 |
-| file | 30.4 |
+| stream | 29.9 |
+| preload | 29.6 |
+| file | 29.4 |
 
 ### Conclusiones
 
-1. **El paralelismo es la palanca clave.** Con el backend nativo el *speedup* es casi lineal hasta 4 *workers* (8.8 → 26.9 int/s, ×3.1) y se aplana al llegar a 8 (×3.6): coherente con una CPU de ~4 núcleos físicos con *hyperthreading*, donde los hilos adicionales comparten unidad de ejecución.
-2. **`native` supera a `gpg` de forma constante (~1.35×)** a igual número de *workers*, porque evita el `fork/exec` de lanzar un proceso por intento. La ventaja es moderada porque el coste del S2K (la derivación de clave) domina el tiempo en ambos.
-3. **La estrategia de generación es irrelevante en velocidad**: `stream`, `preload` y `file` quedan en ~30 int/s. Generar una candidata (nanosegundos) es despreciable frente a la derivación (decenas de ms). Sí importa en **memoria**: `preload` sobre un espacio grande (26⁶ ≈ 300 M) consumiría gigabytes, mientras que `stream` usa memoria constante. Por eso el crackeo real usa `stream`.
+1. **El paralelismo es la palanca clave.** Con el backend nativo el *speedup* es casi lineal hasta 4 *workers* (8.8 → 25.8 int/s, ×2.9) y se aplana al llegar a 8 (×3.3): coherente con una CPU de ~4 núcleos físicos con *hyperthreading*, donde los hilos adicionales comparten unidad de ejecución.
+2. **`native` supera a `gpg` de forma constante (~1.3×)** a igual número de *workers*, porque evita el `fork/exec` de lanzar un proceso por intento. La ventaja es moderada porque el coste del S2K (la derivación de clave) domina el tiempo en ambos backends.
+3. **La estrategia de generación es irrelevante en velocidad**: `stream`, `preload` y `file` quedan en ~29.6 int/s. Generar una candidata (nanosegundos) es despreciable frente a la derivación (decenas de ms). Sí importa en **memoria**: `preload` sobre un espacio grande (26⁶ ≈ 300 M) consumiría gigabytes, mientras que `stream` usa memoria constante. Por eso el crackeo real usa `stream`.
 
 ### Nota sobre el entorno de medición
 
